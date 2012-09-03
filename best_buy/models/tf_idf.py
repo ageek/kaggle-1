@@ -73,24 +73,31 @@ def train(data):
 
 def classify(words, model):
 	scores = score_all(words, model)
-	winner, best = 'unknown', 0.0
-	for sku,score in scores.items():
-		if score >= best:
-			best = score
-			winner = sku
+	winner, best = [], 0.0
+	for sku,sc in scores.items():
+		if sc > best:
+			best = sc
+			winner = [sku]
+		elif sc == best:
+			winner.append(sku)
 	return winner, best
 
 #def test(model, 
 def score_all(query_words, model):
 	output = {}
+	s = 0.
 	for sku,target_words in model.items():
-		output[sku] = score(query_words, target_words)
+		s = score(query_words, target_words)
+		output[sku] = s
 	return output
 
-def score(query, target):
+def score(query, target, debug=False):
 	output = 0
 	for q in query:
-		output += term_frequency(q, target)
+		tf = term_frequency(q, target)
+		output += tf
+		if debug == True:
+			print "TF: " + str(tf) + " " + q + ". Target: " + str(target)
 	return output
 
 def term_frequency(query, target):
@@ -109,14 +116,13 @@ def test(model, data, class_labels):
 	predictions = []
 	for d in data:
 		prediction, score = classify(d, model)
-		print "predicted: " + str(d) + " EQUALS " + str(model[prediction]) + ". With a score of: " + str(score)
 		predictions.append(prediction)
 
 	# see how many are correct
 	correct = 0.
 	for index,prediction in enumerate(predictions):
-		if prediction == class_labels[index]:
-			print 'correct'
+		correct_answer = class_labels[index]
+		if correct_answer in prediction:
 			correct += 1.
 	return correct/len(data)
 	
@@ -126,14 +132,18 @@ def test(model, data, class_labels):
 data = file_to_hash("../data/train.csv", 0, 3)
 model = train(data)
 
+
 array = file_to_array("../data/train.csv")
 class_labels = slice(array, 0)
 test_data = slice(array, 3)
 formatted = []
 for d in test_data:
-	formatted.append(format_string(d))
+	formatted.append(format_string(d).split(' '))
+
+formatted = formatted[41365:]
+class_labels = class_labels[41365:]
 
 start = time.time()
-results = test(model, formatted[42264:], class_labels[42264:])
-print "Precision: " + str(results)
+results = test(model, formatted, class_labels)
+print "Precision: " + str(results) + ". For " + str(len(formatted)) + " examples."
 print "Time: " + str(time.time() - start)
