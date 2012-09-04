@@ -13,6 +13,9 @@ sdist
 develop-eggs
 .installed.cfg
 
+# Data directories
+best_buy/data/*
+
 # Installer logs
 pip-log.txt
 

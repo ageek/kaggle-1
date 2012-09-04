@@ -64,15 +64,17 @@ def slice(data, index):
 
 
 
+###########################
 ######### TF-IDF ##########
+###########################
 
 def train(data):
 	data = format_words(data)
 	output = word_count_hash(data)
 	return output
 
-def classify(words, model):
-	scores = score_all(words, model)
+def classify(words, model, popularity):
+	scores = score_all(words, model, popularity)
 	winner, best = [], 0.0
 	for sku,sc in scores.items():
 		if sc > best:
@@ -80,22 +82,26 @@ def classify(words, model):
 			winner = [sku]
 		elif sc == best:
 			winner.append(sku)
-	return winner, best
+	output = most_popular(winner, popularity)
+	#output = {output.keys()[0]: 1.}
+	return [output], best
 
 #def test(model, 
-def score_all(query_words, model):
+def score_all(query_words, model, popularity):
 	output = {}
 	s = 0.
+	idf = inverse_document_frequency(model, query_words, debug=True)
 	for sku,target_words in model.items():
-		s = score(query_words, target_words)
+		s = score(query_words, target_words, idf)
 		output[sku] = s
 	return output
 
-def score(query, target, debug=False):
+def score(query, target, idf, debug=False):
 	output = 0
 	for q in query:
 		tf = term_frequency(q, target)
-		output += tf
+		tf_idf = tf/idf[q]
+		output += tf_idf
 		if debug == True:
 			print "TF: " + str(tf) + " " + q + ". Target: " + str(target)
 	return output
@@ -111,39 +117,91 @@ def term_frequency(query, target):
 		word_count = 0
 	return float(word_count)/total_words
 
-def test(model, data, class_labels):
+def inverse_document_frequency(model, words, debug=False):
+	idf = {}
+	for w in words:
+		idf[w] = 0.
+	
+	for sku,document in model.items():
+		for w in words:
+			if w in document:
+				idf[w] += 1
+
+	new_idf = {}
+	document_count = len(model)
+	for word,count in idf.items():
+		new_idf[word] = count/document_count
+	return new_idf
+
+def test(model, data, class_labels, popularity):
 	# get the predictions
 	predictions = []
 	for d in data:
-		prediction, score = classify(d, model)
+		prediction, score = classify(d, model, popularity)
 		predictions.append(prediction)
 
 	# see how many are correct
 	correct = 0.
+	total_preds = 0.
 	for index,prediction in enumerate(predictions):
 		correct_answer = class_labels[index]
+		#print str(prediction) + " for " + str(model[correct_answer])
+		total_preds += len(prediction)
 		if correct_answer in prediction:
 			correct += 1.
+	print "Average predictions: " + str(total_preds/len(predictions))
 	return correct/len(data)
-	
 
+def popularity_hash(skus, file_array):
+	output = {}
+	for line in file_array:
+		sku = line[1]
+		if sku in output:
+			output[sku] += 1
+		else:
+			output[sku] = 1
+	return output
+
+def most_popular(skus, popularity):
+	winner, best, best_score = 'failure', 0, 0
+	#for sku,score in skus.items():
+	for sku in skus:
+		clicks = popularity[sku]
+		if clicks >= best:
+			winner = sku
+			#best_score = score
+	return winner #{winner: best_score}
+			
+
+###########################
 ######### TF-IDF ##########
+###########################
 
-data = file_to_hash("../data/train.csv", 0, 3)
+
+################# training data ###################
+data = file_to_hash("../data/train.csv", 1, 3)
 model = train(data)
 
+data = file_to_array("../data/train.csv")
+popularity = popularity_hash(class_labels, data)
+#formatted_test_data = formatted_test_data[41365:]
+#class_labels = class_labels[41365:]
+################# training data ###################
 
-array = file_to_array("../data/train.csv")
-class_labels = slice(array, 0)
-test_data = slice(array, 3)
-formatted = []
+
+
+################# testing data ####################
+array = file_to_array("../data/test.csv")
+class_labels = slice(array, 1)
+test_data = slice(array, 2)
+formatted_test_data = []
 for d in test_data:
-	formatted.append(format_string(d).split(' '))
+	formatted_test_data.append(format_string(d).split(' '))
+################# testing data ####################
 
-formatted = formatted[41365:]
-class_labels = class_labels[41365:]
 
 start = time.time()
-results = test(model, formatted, class_labels)
-print "Precision: " + str(results) + ". For " + str(len(formatted)) + " examples."
+results = test(model, formatted_test_data, class_labels, popularity)
+print "Precision: " + str(results)
+print str(len(formatted_test_data)) + " examples."
 print "Time: " + str(time.time() - start)
