@@ -46,11 +46,11 @@ def format_string(string):
 
 # Accepts a hash as input.  It takes a hash of keys to strings and counts the words in each string.
 # It returns the hash of key to the count
-def word_count_hash(data):
+def word_count_hash(data, ngram=1):
 	output = data
 	for sku,v in data.items():
 		output[sku] = {}
-		for word in v.split(' '):
+		for word in tokenize(v, ngram):
 			if word in output[sku]:
 				count = output[sku][word] + 1
 			else:
@@ -70,9 +70,9 @@ def slice(data, index):
 ######### TF-IDF ##########
 ###########################
 
-def train(data):
+def train(data, ngram=1):
 	data = format_words(data)
-	output = word_count_hash(data)
+	output = word_count_hash(data, ngram)
 	return output
 
 def classify(words, model, popularity):
@@ -82,6 +82,7 @@ def classify(words, model, popularity):
 	sorted_scores = sorted(scores.iteritems(), key=operator.itemgetter(1))
 	sorted_scores.reverse()
 	sorted_scores_list = []
+	print sorted_scores[0][1]
 	for x in sorted_scores[0:top_items]:
 		sorted_scores_list.append(x[0])
 	return sorted_scores_list
@@ -117,7 +118,9 @@ def term_frequency(query, target):
 	total_words = 0
 	for word,count in target.items():
 		total_words += count
-
+	# in case a higher n-gram doesn't have anything that long
+	if total_words == 0:
+		total_words = 1
 	if query in target:
 		word_count = target[query]
 	else:
@@ -149,6 +152,7 @@ def predict_all(data, model):
 	return output
 
 
+# Returns the percent that were correct and the predictions.
 def test(model, data, class_labels, popularity):
 	predictions = predict_all(data, model)
 	
@@ -161,6 +165,9 @@ def test(model, data, class_labels, popularity):
 		total_preds += len(prediction)
 		if correct_answer in prediction:
 			correct += 1.
+			print "Correct"
+		else:
+			print "Incorect"
 	print "Average predictions: " + str(total_preds/len(predictions))
 	return correct/len(data), predictions
 
@@ -184,21 +191,23 @@ def most_popular(skus, popularity):
 			#best_score = score
 	return winner #{winner: best_score}
 			
-def train_model(csv_file, class_labels_index, input_data_index):
+def train_model(csv_file, class_labels_index, input_data_index, ngram=1):
 	data = file_to_hash(csv_file, class_labels_index, input_data_index)
-	model = train(data)
+	model = train(data, ngram)
 	class_labels = slice(file_to_array(csv_file), class_labels_index)
 	data = file_to_array(csv_file)
 	popularity = popularity_hash(class_labels, data)
 	return model, popularity
 
-def test_data(csv_file, class_labels_index, input_data_index, items_count='All'):
+def test_data(csv_file, class_labels_index, input_data_index, items_count='All', ngram=1):
 	array = file_to_array(csv_file)
 	class_labels = slice(array, class_labels_index)
 	test_data = slice(array, input_data_index)
 	formatted_test_data = []
 	for d in test_data:
-		formatted_test_data.append(format_string(d).split(' '))
+		formatted = format_string(d)
+		tokens = tokenize(formatted, ngram)
+		formatted_test_data.append(tokens)
 	if items_count != 'All':
 		count = len(class_labels) - items_count
 		class_labels = class_labels[count:]
@@ -212,17 +221,26 @@ def write_predictions(predictions, csv_file):
 		for p in predictions:
 			writer.writerow([" ".join(p)])
 
+def tokenize(sentence, ngram=1):
+	output = []
+	tokens = sentence.split(' ')
+	n_tokens = len(tokens)
+	for i in xrange(n_tokens):
+		for j in xrange(i+ngram, min(n_tokens, i+ngram)+1):
+			joined = ' '.join(tokens[i:j])
+			output.append(joined)
+	return output
+
 ###########################
 ######### TF-IDF ##########
 ###########################
 
 
-model, popularity = train_model("../data/train.csv", 1, 3)
-class_labels, test_data = test_data("../data/test.csv", 1, 2)
-
+ngram = 3
+sample_size = 100
+model, popularity = train_model("../data/train.csv", 1, 3, ngram)
+class_labels, test_data = test_data("../data/train.csv", 1, 3, sample_size, ngram)
 
 start = time.time()
-predictions = predict_all(test_data, model)
-write_predictions(predictions, "../data/predictions_9_4_12.csv")
-#precision, predictions = test(model, test_data, class_labels, popularity)
-#print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
+precision, predictions = test(model, test_data, class_labels, popularity)
+print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
