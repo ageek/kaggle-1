@@ -1,5 +1,7 @@
 import re
 import time
+import operator
+import csv
 
 def file_to_array(file_name, ignore_line_1=True):
 	output = []
@@ -74,17 +76,15 @@ def train(data):
 	return output
 
 def classify(words, model, popularity):
+	top_items = 5 # Number of predictions to return
 	scores = score_all(words, model, popularity)
 	winner, best = [], 0.0
-	for sku,sc in scores.items():
-		if sc > best:
-			best = sc
-			winner = [sku]
-		elif sc == best:
-			winner.append(sku)
-	output = most_popular(winner, popularity)
-	#output = {output.keys()[0]: 1.}
-	return [output], best
+	sorted_scores = sorted(scores.iteritems(), key=operator.itemgetter(1))
+	sorted_scores.reverse()
+	sorted_scores_list = []
+	for x in sorted_scores[0:top_items]:
+		sorted_scores_list.append(x[0])
+	return sorted_scores_list
 
 #def test(model, 
 def score_all(query_words, model, popularity):
@@ -100,7 +100,14 @@ def score(query, target, idf, debug=False):
 	output = 0
 	for q in query:
 		tf = term_frequency(q, target)
-		tf_idf = tf/idf[q]
+		if q in idf:
+			word_idf = idf[q]
+		else:
+			word_idf = 1.
+		if word_idf == 0.:
+			word_idf = 1.
+
+		tf_idf = tf/word_idf
 		output += tf_idf
 		if debug == True:
 			print "TF: " + str(tf) + " " + q + ". Target: " + str(target)
@@ -133,13 +140,18 @@ def inverse_document_frequency(model, words, debug=False):
 		new_idf[word] = count/document_count
 	return new_idf
 
-def test(model, data, class_labels, popularity):
-	# get the predictions
-	predictions = []
+# get the predictions
+def predict_all(data, model):
+	output = []
 	for d in data:
-		prediction, score = classify(d, model, popularity)
-		predictions.append(prediction)
+		prediction = classify(d, model, popularity)
+		output.append(prediction)
+	return output
 
+
+def test(model, data, class_labels, popularity):
+	predictions = predict_all(data, model)
+	
 	# see how many are correct
 	correct = 0.
 	total_preds = 0.
@@ -150,7 +162,7 @@ def test(model, data, class_labels, popularity):
 		if correct_answer in prediction:
 			correct += 1.
 	print "Average predictions: " + str(total_preds/len(predictions))
-	return correct/len(data)
+	return correct/len(data), predictions
 
 def popularity_hash(skus, file_array):
 	output = {}
@@ -172,36 +184,45 @@ def most_popular(skus, popularity):
 			#best_score = score
 	return winner #{winner: best_score}
 			
+def train_model(csv_file, class_labels_index, input_data_index):
+	data = file_to_hash(csv_file, class_labels_index, input_data_index)
+	model = train(data)
+	class_labels = slice(file_to_array(csv_file), class_labels_index)
+	data = file_to_array(csv_file)
+	popularity = popularity_hash(class_labels, data)
+	return model, popularity
+
+def test_data(csv_file, class_labels_index, input_data_index, items_count='All'):
+	array = file_to_array(csv_file)
+	class_labels = slice(array, class_labels_index)
+	test_data = slice(array, input_data_index)
+	formatted_test_data = []
+	for d in test_data:
+		formatted_test_data.append(format_string(d).split(' '))
+	if items_count != 'All':
+		count = len(class_labels) - items_count
+		class_labels = class_labels[count:]
+		formatted_test_data = formatted_test_data[count:]
+	return class_labels, formatted_test_data
+
+def write_predictions(predictions, csv_file):
+	with open(csv_file, "w") as outfile:
+		writer = csv.writer(outfile, delimiter=",")
+		writer.writerow(["sku"])
+		for p in predictions:
+			writer.writerow([" ".join(p)])
 
 ###########################
 ######### TF-IDF ##########
 ###########################
 
 
-################# training data ###################
-data = file_to_hash("../data/train.csv", 1, 3)
-model = train(data)
-
-data = file_to_array("../data/train.csv")
-popularity = popularity_hash(class_labels, data)
-#formatted_test_data = formatted_test_data[41365:]
-#class_labels = class_labels[41365:]
-################# training data ###################
-
-
-
-################# testing data ####################
-array = file_to_array("../data/test.csv")
-class_labels = slice(array, 1)
-test_data = slice(array, 2)
-formatted_test_data = []
-for d in test_data:
-	formatted_test_data.append(format_string(d).split(' '))
-################# testing data ####################
+model, popularity = train_model("../data/train.csv", 1, 3)
+class_labels, test_data = test_data("../data/test.csv", 1, 2)
 
 
 start = time.time()
-results = test(model, formatted_test_data, class_labels, popularity)
-print "Precision: " + str(results)
-print str(len(formatted_test_data)) + " examples."
-print "Time: " + str(time.time() - start)
+predictions = predict_all(test_data, model)
+write_predictions(predictions, "../data/predictions_9_4_12.csv")
+#precision, predictions = test(model, test_data, class_labels, popularity)
+#print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
