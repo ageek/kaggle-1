@@ -92,7 +92,6 @@ def classify(words, model, popularity):
 	sorted_scores = sorted(scores.iteritems(), key=operator.itemgetter(1))
 	sorted_scores.reverse()
 	sorted_scores_list = []
-	print sorted_scores[0][1]
 	for x in sorted_scores[0:top_items]:
 		sorted_scores_list.append(x[0])
 	return sorted_scores_list
@@ -120,8 +119,6 @@ def score(query, target, idf, debug=False):
 
 		tf_idf = tf/word_idf
 		output += tf_idf
-		if debug == True:
-			print "TF: " + str(tf) + " " + q + ". Target: " + str(target)
 	return output
 
 def term_frequency(query, target):
@@ -154,7 +151,7 @@ def inverse_document_frequency(model, words, debug=False):
 	return new_idf
 
 # get the predictions
-def predict_all(data, model):
+def predict_all(data, model, popularity):
 	output = []
 	for d in data:
 		prediction = classify(d, model, popularity)
@@ -171,13 +168,9 @@ def test(model, data, class_labels, popularity):
 	total_preds = 0.
 	for index,prediction in enumerate(predictions):
 		correct_answer = class_labels[index]
-		#print str(prediction) + " for " + str(model[correct_answer])
 		total_preds += len(prediction)
 		if correct_answer in prediction:
 			correct += 1.
-			print "Correct"
-		else:
-			print "Incorect"
 	print "Average predictions: " + str(total_preds/len(predictions))
 	return correct/len(data), predictions
 
@@ -241,16 +234,19 @@ def tokenize(sentence, ngram=1):
 			output.append(joined)
 	return output
 
+def real_test():
+	ngram = 1
+	sample_size = 'All'
+	model, popularity = train_model("../data/train.csv", 1, 3, ngram)
+	class_labels, td = test_data("../data/test.csv", 1, 2, sample_size, ngram)
+	predictions = predict_all(td, model, popularity)
+	return predictions
+
+	
+
 ###########################
 ######### TF-IDF ##########
 ###########################
-
-
-#ngram = 3
-#sample_size = 'All'
-#model, popularity = train_model("../data/train.csv", 1, 3, ngram)
-#class_labels, test_data = test_data("../data/train.csv", 1, 3, sample_size, ngram)
-#print len(class_labels)
 
 #start = time.time()
 #precision, predictions = test(model, test_data, class_labels, popularity)

@@ -5,14 +5,12 @@ zero = 8
 one = 1
 length = zero + one + one
 
-def random_vector(zero, one, negative=False):
-	z = zeros(zero)
-	positives = ones(one)
-	if negative == True:
-		negatives = ones(one) - 2
-		merged = array(list(z) + list(positives) + list(negatives))
-	elif negative == False:
-		merged = array(list(z) + list(positives) + list(positives))
+def random_vector(vector_length):
+	one_count = vector_length * 0.02
+	zero_count = vector_length - one_count
+	z = zeros(zero_count)
+	positives = ones(one_count)
+	merged = array(list(z) + list(positives))
 	shuffle(merged)
 	return merged
 
