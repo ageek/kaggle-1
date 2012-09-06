@@ -64,6 +64,16 @@ def slice(data, index):
 		output.append(d[index])
 	return output
 
+def string_to_hash(string):
+	word_count = {}
+	formatted = format_string(string)
+	for token in tokenize(formatted):
+		if token in word_count:
+			word_count[token] += 1
+		else:
+			word_count[token] = 1
+	return word_count
+
 
 
 ###########################
@@ -236,11 +246,12 @@ def tokenize(sentence, ngram=1):
 ###########################
 
 
-ngram = 3
-sample_size = 100
-model, popularity = train_model("../data/train.csv", 1, 3, ngram)
-class_labels, test_data = test_data("../data/train.csv", 1, 3, sample_size, ngram)
+#ngram = 3
+#sample_size = 'All'
+#model, popularity = train_model("../data/train.csv", 1, 3, ngram)
+#class_labels, test_data = test_data("../data/train.csv", 1, 3, sample_size, ngram)
+#print len(class_labels)
 
-start = time.time()
-precision, predictions = test(model, test_data, class_labels, popularity)
-print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
+#start = time.time()
+#precision, predictions = test(model, test_data, class_labels, popularity)
+#print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
