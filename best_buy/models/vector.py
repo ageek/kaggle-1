@@ -32,4 +32,4 @@ def word_vectors(corpus, negative):
 	return dict
 
 def cosine(v1,v2):
-	return float(dot(v1,v2) / (norm(v1) * norm(v2)))
+	return float(dot(v1,v2) / (linalg.norm(v1) * linalg.norm(v2)))

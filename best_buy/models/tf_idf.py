@@ -1,88 +1,15 @@
 import re
 import time
 import operator
-import csv
+import sys
+sys.path.append("../../")
+import kaggle
+import popular
 
-def file_to_array(file_name, ignore_line_1=True):
-	output = []
-	f = file(file_name)
-	f = f.readlines()
-	if ignore_line_1 == True:
-		f.pop(0)
-	for line in f:
-		l = line.split(',')
-		output.append(l)
-	return output
-
-# Take a file path as input.
-def file_to_hash(file_name, key, value):
-	output = {}
-	f = file_to_array(file_name)
-	for line in f:
-		k = str(line[key])
-		v = line[value]
-		if k in output:
-			old_v = output[k]
-		else:
-			old_v = ''
-		output[k] = old_v + ' ' + v
-	return output
-
-# Accepts a hash an input.
-# THe has should be keys to strings.
-# It returns the hash with the strings formatted.
-def format_words(data):
-	output = {}
-	for k,v in data.items():
-		output[k] = format_string(v)
-	return output
-
-def format_string(string):
-	v = re.sub("[\"']", '', string) # remove quotes
-	v = v.lower() # lowercase
-	v = re.sub("\s{2,}", "\s", v) # change double space to single space
-	v = re.sub("(\s\n|\A\s)", '', v) # remove end/beginning of line blank space
-	return v
-
-# Accepts a hash as input.  It takes a hash of keys to strings and counts the words in each string.
-# It returns the hash of key to the count
-def word_count_hash(data, ngram=1):
-	output = data
-	for sku,v in data.items():
-		output[sku] = {}
-		for word in tokenize(v, ngram):
-			if word in output[sku]:
-				count = output[sku][word] + 1
-			else:
-				count = 1
-			output[sku][word] = count
-	return output
-
-def slice(data, index):
-	output = []
-	for d in data:
-		output.append(d[index])
-	return output
-
-def string_to_hash(string):
-	word_count = {}
-	formatted = format_string(string)
-	for token in tokenize(formatted):
-		if token in word_count:
-			word_count[token] += 1
-		else:
-			word_count[token] = 1
-	return word_count
-
-
-
-###########################
-######### TF-IDF ##########
-###########################
 
 def train(data, ngram=1):
-	data = format_words(data)
-	output = word_count_hash(data, ngram)
+	data = kaggle.format_words(data)
+	output = kaggle.word_count_hash(data, ngram)
 	return output
 
 def classify(words, model, popularity):
@@ -174,65 +101,28 @@ def test(model, data, class_labels, popularity):
 	print "Average predictions: " + str(total_preds/len(predictions))
 	return correct/len(data), predictions
 
-def popularity_hash(skus, file_array):
-	output = {}
-	for line in file_array:
-		sku = line[1]
-		if sku in output:
-			output[sku] += 1
-		else:
-			output[sku] = 1
-	return output
-
-def most_popular(skus, popularity):
-	winner, best, best_score = 'failure', 0, 0
-	#for sku,score in skus.items():
-	for sku in skus:
-		clicks = popularity[sku]
-		if clicks >= best:
-			winner = sku
-			#best_score = score
-	return winner #{winner: best_score}
-			
 def train_model(csv_file, class_labels_index, input_data_index, ngram=1):
-	data = file_to_hash(csv_file, class_labels_index, input_data_index)
+	data = kaggle.file_to_hash(csv_file, class_labels_index, input_data_index)
 	model = train(data, ngram)
-	class_labels = slice(file_to_array(csv_file), class_labels_index)
-	data = file_to_array(csv_file)
-	popularity = popularity_hash(class_labels, data)
+	class_labels = kaggle.slice(kaggle.file_to_array(csv_file), class_labels_index)
+	data = kaggle.file_to_array(csv_file)
+	popularity = popular.popularity_hash(class_labels, data)
 	return model, popularity
 
 def test_data(csv_file, class_labels_index, input_data_index, items_count='All', ngram=1):
-	array = file_to_array(csv_file)
-	class_labels = slice(array, class_labels_index)
-	test_data = slice(array, input_data_index)
+	array = kaggle.file_to_array(csv_file)
+	class_labels = kaggle.slice(array, class_labels_index)
+	test_data = kaggle.slice(array, input_data_index)
 	formatted_test_data = []
 	for d in test_data:
-		formatted = format_string(d)
-		tokens = tokenize(formatted, ngram)
+		formatted = kaggle.format_string(d)
+		tokens = kaggle.tokenize(formatted, ngram)
 		formatted_test_data.append(tokens)
 	if items_count != 'All':
 		count = len(class_labels) - items_count
 		class_labels = class_labels[count:]
 		formatted_test_data = formatted_test_data[count:]
 	return class_labels, formatted_test_data
-
-def write_predictions(predictions, csv_file):
-	with open(csv_file, "w") as outfile:
-		writer = csv.writer(outfile, delimiter=",")
-		writer.writerow(["sku"])
-		for p in predictions:
-			writer.writerow([" ".join(p)])
-
-def tokenize(sentence, ngram=1):
-	output = []
-	tokens = sentence.split(' ')
-	n_tokens = len(tokens)
-	for i in xrange(n_tokens):
-		for j in xrange(i+ngram, min(n_tokens, i+ngram)+1):
-			joined = ' '.join(tokens[i:j])
-			output.append(joined)
-	return output
 
 def real_test():
 	ngram = 1
@@ -244,10 +134,8 @@ def real_test():
 
 	
 
-###########################
-######### TF-IDF ##########
-###########################
-
 #start = time.time()
+#real_test()
+#print time.time() - start
 #precision, predictions = test(model, test_data, class_labels, popularity)
 #print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
