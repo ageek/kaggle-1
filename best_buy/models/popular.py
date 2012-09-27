@@ -1,3 +1,5 @@
+import operator
+
 # this returns the input for the most_popular() function.
 def popularity_hash(skus, file_array):
 	output = {}
@@ -19,3 +21,15 @@ def most_popular(skus, popularity):
 			#best_score = score
 	return winner #{winner: best_score}
 			
+def sort_by_popularity(skus, popularity):
+	skus = set(skus)
+	rank = {}
+	for s in skus:
+		rank[s] = popularity[s]
+	sorted_scores = sorted(rank.iteritems(), key=operator.itemgetter(1))
+	sorted_scores.reverse()
+
+	output = []
+	for s in sorted_scores:
+		output.append(s[0])
+	return output

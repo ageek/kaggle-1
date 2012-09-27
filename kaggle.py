@@ -1,7 +1,7 @@
 import re
 import csv
 
-def file_to_array(file_name, ignore_line_1=True):
+def file_to_array(file_name, validation, ignore_line_1=True):
 	output = []
 	f = file(file_name)
 	f = f.readlines()
@@ -10,12 +10,18 @@ def file_to_array(file_name, ignore_line_1=True):
 	for line in f:
 		l = line.split(',')
 		output.append(l)
+
+	if validation == True:
+		output = output[3::4]
+	elif validation == False:
+		output = output[0::4] + output[1::4] + output[2::4]
+
 	return output
 
 # Take a file path as input.
-def file_to_hash(file_name, key, value):
+def file_to_hash(file_name, key, value, validation="all"):
 	output = {}
-	f = file_to_array(file_name)
+	f = file_to_array(file_name, validation)
 	for line in f:
 		k = str(line[key])
 		v = line[value]

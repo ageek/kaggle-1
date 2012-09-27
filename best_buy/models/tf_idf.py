@@ -6,6 +6,9 @@ sys.path.append("../../")
 import kaggle
 import popular
 
+training = "../data/train.csv"
+extra = "../data/sku_names.csv"
+
 
 def train(data, ngram=1):
 	data = kaggle.format_words(data)
@@ -85,10 +88,16 @@ def predict_all(data, model, popularity):
 		output.append(prediction)
 	return output
 
+def voted_predict_all(data, model1, model2, popularity):
+	predictions1 = predict_all(data, model1, popularity)
+	predictions2 = predict_all(data, model2, popularity)
+	predictions = vote(predictions1, predictions2, popularity)
+	return predictions
+
 
 # Returns the percent that were correct and the predictions.
-def test(model, data, class_labels, popularity):
-	predictions = predict_all(data, model)
+def test(model1, model2, data, class_labels, popularity):
+	predictions = voted_predict_all(data, model1, model2, popularity)
 	
 	# see how many are correct
 	correct = 0.
@@ -101,16 +110,18 @@ def test(model, data, class_labels, popularity):
 	print "Average predictions: " + str(total_preds/len(predictions))
 	return correct/len(data), predictions
 
-def train_model(csv_file, class_labels_index, input_data_index, ngram=1):
-	data = kaggle.file_to_hash(csv_file, class_labels_index, input_data_index)
+def train_model(csv_file, ngram=1, validation=False):
+	class_labels_index = 1
+	input_data_index = 3
+	data = kaggle.file_to_hash(csv_file, class_labels_index, input_data_index, validation)
 	model = train(data, ngram)
-	class_labels = kaggle.slice(kaggle.file_to_array(csv_file), class_labels_index)
-	data = kaggle.file_to_array(csv_file)
+	data = kaggle.file_to_array(csv_file, validation)
+	class_labels = kaggle.slice(data, class_labels_index)
 	popularity = popular.popularity_hash(class_labels, data)
 	return model, popularity
 
-def test_data(csv_file, class_labels_index, input_data_index, items_count='All', ngram=1):
-	array = kaggle.file_to_array(csv_file)
+def test_data(csv_file, class_labels_index, input_data_index, validation, items_count, ngram=1):
+	array = kaggle.file_to_array(csv_file, validation)
 	class_labels = kaggle.slice(array, class_labels_index)
 	test_data = kaggle.slice(array, input_data_index)
 	formatted_test_data = []
@@ -119,23 +130,71 @@ def test_data(csv_file, class_labels_index, input_data_index, items_count='All',
 		tokens = kaggle.tokenize(formatted, ngram)
 		formatted_test_data.append(tokens)
 	if items_count != 'All':
-		count = len(class_labels) - items_count
-		class_labels = class_labels[count:]
-		formatted_test_data = formatted_test_data[count:]
+		class_labels, formatted_test_data = class_labels[0:items_count], formatted_test_data[0:items_count]
 	return class_labels, formatted_test_data
+
+def vote(pred1, pred2, popularity):
+	output = []
+
+	uni_gram_weight = 1.0
+	bi_gram_weight = 0.001#0.7
+	popular_weight = 0.001#1.5
+	for index,preds in enumerate(pred1):
+		scored = {}
+		pop = popular.sort_by_popularity(preds + pred2[index], popularity)
+
+		length = len(preds)
+		#print preds
+		for i,p in enumerate(preds):
+			score = (1 - (float(i)/length)) * uni_gram_weight
+			if p in scored:
+				scored[p] += score
+			elif p not in scored:
+				scored[p] = score
+		#print pred2[index]
+		for i,p in enumerate(pred2[index]):
+			score = (1 - (float(i)/length)) * bi_gram_weight
+			if p in scored:
+				scored[p] += score
+			elif p not in scored:
+				scored[p] = score
+		for i,p in enumerate(pop):
+			score = (1 - (float(i)/length)) * popular_weight
+			if p in scored:
+				scored[p] += score
+			elif p not in scored:
+				scored[p] = score
+		sorted_scores = sorted(scored.iteritems(), key=operator.itemgetter(1))
+		sorted_scores.reverse()
+		#print sorted_scores
+		sub_out = []
+		for x in sorted_scores[0:5]:
+			sub_out.append(x[0])
+		output.append(sub_out)
+		#print sub_out
+	return output
+
+		
 
 def real_test():
 	ngram = 1
 	sample_size = 'All'
-	model, popularity = train_model("../data/train.csv", 1, 3, ngram)
+	model1, popularity = train_model(training, ngram=1)
+	model2, popularity = train_model(extra, ngram=1)
 	class_labels, td = test_data("../data/test.csv", 1, 2, sample_size, ngram)
-	predictions = predict_all(td, model, popularity)
+	predictions = voted_predict_all(td, model1, model2, popularity)
 	return predictions
 
+def validation_test():
+	start = time.time()
+	sample_size = 'All'
+	model1, popularity = train_model(training, ngram=1, validation=False)
+	_, popularity = train_model(training, ngram=1, validation="all")
+	model2, _ = train_model(extra, ngram=1, validation="all")
 	
+	validation = True
+	class_labels, _test_data = test_data(training, 1, 3, validation, sample_size)
+	precision, predictions = test(model1, model2, _test_data, class_labels, popularity)
+	return "Precision: " + str(precision) + ".\n" + str(len(_test_data)) + " examples.\n Time: " + str(time.time() - start)
 
-#start = time.time()
-#real_test()
-#print time.time() - start
-#precision, predictions = test(model, test_data, class_labels, popularity)
-#print "Precision: " + str(precision) + ".\n" + str(len(test_data)) + " examples.\n Time: " + str(time.time() - start)
+print validation_test()
