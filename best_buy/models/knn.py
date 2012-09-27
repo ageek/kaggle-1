@@ -1,4 +1,4 @@
-import tf_idf
+#import tf_idf
 from numpy import *
 from datetime import datetime
 from sklearn import neighbors as kNN
@@ -17,39 +17,8 @@ vector_length = 200
 sample_size = 'All'
 training = "../data/train.csv"
 testing = "../data/test.csv"
+extra = "../data/extra.csv"
 
-
-def reflected_sku_vectors():
-	array = kaggle.file_to_array(training)
-	users = kaggle.slice(array, 0)
-	skus = kaggle.slice(array, 1)
-	user_vects = {}
-	sku_users = {}
-	sku_vects = {}
-	for i in range(len(users)):
-		u = users[i]
-		sku = skus[i]
-		if u not in user_vects:
-			user_vects[u] = vector.random_vector(vector_length)
-
-		if sku in sku_users:
-			sku_users[sku].append(u)
-		elif sku not in sku_users:
-			sku_users[sku] = [u]
-			sku_vects[sku] = zeros(vector_length)
-
-	for sku,users in sku_users.items():
-		for u in users:
-			sku_vects[sku] += user_vects[u]
-
-	return sku_vects
-
-def random_sku_vectors(sku_array, vector_length):
-	sku_vects = {}
-	for sku in sku_array:
-		if sku not in sku_vects:
-			sku_vects[sku] = vector.random_vector(vector_length)
-	return sku_vects
 
 def sku_vectors(sku_words, word_vector_hash, vector_length):
 	for pair in sku_words:
@@ -83,7 +52,7 @@ def query_vector(word_hash, word_vector_hash, vector_length):
 def word_vectors(csv_file, vector_length, word_to_skus=None, generated_sku_vectors=None, algorithm="normal"):
 	word_vects = {}
 	words_index = 3
-	queries = kaggle.slice(kaggle.file_to_array(csv_file), words_index)
+	queries = kaggle.slice(kaggle.file_to_array(csv_file, "All"), words_index)
 	for q in queries:
 		formatted = kaggle.format_string(q)
 		for word in kaggle.tokenize(formatted):
@@ -105,23 +74,6 @@ def word_vectors(csv_file, vector_length, word_to_skus=None, generated_sku_vecto
 
 	return word_vects
 
-def word_to_sku_hash(csv_file):
-	output = {}
-	array = kaggle.file_to_array(csv_file)
-	text = kaggle.slice(array, 3)
-	skus = kaggle.slice(array, 1)
-	for i in range(len(text)):
-		words = text[i]
-		sku = skus[i]
-		formatted = kaggle.format_string(words)
-		for word in kaggle.tokenize(formatted):
-			if word in output:
-				output[word].append(sku)
-			else:
-				output[word] = [sku]
-	return output
-	
-
 
 # return a list of vectors for each query, and a list of skus for each query,
 # and a hash of words to their vectors that generated the query vectors
@@ -130,7 +82,7 @@ def data(csv_file, vector_length):
 
 	# generate the sku-words
 	sku_words = []
-	array = kaggle.file_to_array(csv_file)
+	array = kaggle.file_to_array(csv_file, "All")
 	class_labels = kaggle.slice(array, 1)
 	text = kaggle.slice(array, 3)
 	indexes = len(text)
@@ -150,28 +102,6 @@ def data(csv_file, vector_length):
 	sku_hash = sku_vector_hash(sku_words, word_vector_hash, vector_length)
 
 	return vects, class_labels, word_vector_hash, sku_hash
-
-def reflected_data(vector_length):
-
-	# generate the sku-words
-	# dupliactedf rom above
-	sku_words = []
-	array = kaggle.file_to_array(training)
-	class_labels = kaggle.slice(array, 1)
-	text = kaggle.slice(array, 3)
-	indexes = len(text)
-	for i in range(indexes):
-		word_count = kaggle.string_to_hash(text[i])
-		label = class_labels[i]
-		line_array = [label, word_count]
-		sku_words.append(line_array)
-
-	# new stuff
-	w = word_to_sku_hash(training)
-	#sku_vects = random_sku_vectors(class_labels, vector_length) # without user reflection
-	sku_vects = reflected_sku_vectors()# with user reflection
-	word_vects = word_vectors(training, vector_length, w, sku_vects, algorithm="reflected")
-	final_sku_vects = sku_vectors(sku_words, word_vects, vector_length)
 
 
 	# get a list of only the vectors
@@ -193,11 +123,8 @@ def log(csv_file, message):
 			writer.writerow([" ".join(m)])
 	return None
 
-def train(csv_file, neighbors, vector_length, algorithm="normal"):
-	if algorithm == "normal":
-		sku_vectors, class_labels, word_vectors, sku_hash = data(csv_file, vector_length)
-	elif algorithm == "reflected":
-		sku_vectors, class_labels, word_vectors, sku_hash = reflected_data(vector_length)
+def train(csv_file, neighbors, vector_length):
+	sku_vectors, class_labels, word_vectors, sku_hash = data(csv_file, vector_length)
 	model = kNN.KNeighborsClassifier(n_neighbors=neighbors, weights='uniform')
 	model.fit(sku_vectors, class_labels)
 	return model, word_vectors, sku_vectors, class_labels, sku_hash
@@ -225,19 +152,17 @@ def evaluate():
 	log("out2.csv", out)
 
 def real_test():
-	vector_length = 100
+	vector_length = 200
 	neighbors = 20
 	output = []
-	model, word_vectors, _, _2, sku_hash = train(training, neighbors, vector_length, algorithm="normal")
-	queries = kaggle.slice(kaggle.file_to_array(testing), 2)
+	model, word_vectors, _, _, sku_hash = train(extra, neighbors, vector_length)
+	queries = kaggle.slice(kaggle.file_to_array(testing, "All"), 2)
+
 	for q in queries:
 		word_hash = kaggle.string_to_hash(kaggle.format_string(q))
 		vect = query_vector(word_hash, word_vectors, vector_length)
 		pred = model.predict(vect)[0]
-		p_vector = sku_hash[str(pred)]
-		predictions = nearest_skus(p_vector, sku_hash)
-		output.append(predictions)
-	print output
+		output.append([pred])
 	return output
 
 def nearest_skus(search, sku_vectors):
@@ -252,38 +177,21 @@ def nearest_skus(search, sku_vectors):
 		sorted_dist_list.append(str(x[0]))
 	return sorted_dist_list
 
-	
 
-#n = 20
-##sample_size = 42365
-#sample_size = 100
-#
-#model, word_vectors, sku_vectors, labels, sku_hash = train(training, n, vector_length, algorithm="normal")
-#queries = kaggle.slice(kaggle.file_to_array(training), 3)
-#test_data = []
-#for q in queries:
-#	word_hash = kaggle.string_to_hash(kaggle.format_string(q))
-#	test_data.append(query_vector(word_hash, word_vectors, vector_length))
-#
-#print test(model, n, test_data, labels, sample_size, vector_length, sku_hash)
+start = time.time()
 
+n = 20
+#sample_size = 42365
+sample_size = 100
 
+model, word_vectors, sku_vectors, labels, sku_hash = train(extra, n, vector_length)
+array = kaggle.file_to_array(training, "All")
+labels = kaggle.slice(array, 1)
+queries = kaggle.slice(array, 3)
+test_data = []
+for q in queries:
+	word_hash = kaggle.string_to_hash(kaggle.format_string(q))
+	test_data.append(query_vector(word_hash, word_vectors, vector_length))
+print test(model, n, test_data, labels, sample_size, vector_length, sku_hash)
 
-
-
-#csv_file = training
-#word_vector_hash = word_vectors(csv_file, vector_length)
-#sku_words = []
-#array = kaggle.file_to_array(csv_file)
-#class_labels = kaggle.slice(array, 1)
-#text = kaggle.slice(array, 3)
-#indexes = len(text)
-#for i in range(indexes):
-#	word_count = kaggle.string_to_hash(text[i])
-#	label = class_labels[i]
-#	line_array = [label, word_count]
-#	sku_words.append(line_array)
-#
-#sku_hash = sku_vector_hash(sku_words, word_vector_hash, vector_length)
-#v = sku_hash['2807036']
-#print vector.cosine(v,v)
+print "Duration: " + str(time.time() - start)
