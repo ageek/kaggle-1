@@ -49,40 +49,27 @@ def query_vector(word_hash, word_vector_hash, vector_length):
 	query_vector = query_vector/(linalg.norm(query_vector))
 	return query_vector
 
-def word_vectors(csv_file, vector_length, word_to_skus=None, generated_sku_vectors=None, algorithm="normal"):
+def word_vectors(csv_file, vector_length, validation, word_to_skus=None, generated_sku_vectors=None):
 	word_vects = {}
 	words_index = 3
-	queries = kaggle.slice(kaggle.file_to_array(csv_file, "All"), words_index)
+	queries = kaggle.slice(kaggle.file_to_array(csv_file, validation), words_index)
 	for q in queries:
 		formatted = kaggle.format_string(q)
 		for word in kaggle.tokenize(formatted):
-
-			if algorithm == "normal":
-				if word not in word_vects:
-					word_vects[word] = vector.random_vector(vector_length)
-
-	# start of reflected
-			elif algorithm == "reflected":
-				word_vects[word] = zeros(vector_length)
-	
-	if algorithm == "reflected":
-		for word in word_vects.keys():
-			skus = word_to_skus[word]
-			for sku in skus:
-				word_vects[word] += generated_sku_vectors[sku]
-	# end of reflected
+			if word not in word_vects:
+				word_vects[word] = vector.random_vector(vector_length)
 
 	return word_vects
 
 
 # return a list of vectors for each query, and a list of skus for each query,
 # and a hash of words to their vectors that generated the query vectors
-def data(csv_file, vector_length):
-	word_vector_hash = word_vectors(csv_file, vector_length)
+def data(csv_file, vector_length, validation):
+	word_vector_hash = word_vectors(csv_file, vector_length, validation)
 
 	# generate the sku-words
 	sku_words = []
-	array = kaggle.file_to_array(csv_file, "All")
+	array = kaggle.file_to_array(csv_file, validation)
 	class_labels = kaggle.slice(array, 1)
 	text = kaggle.slice(array, 3)
 	indexes = len(text)
@@ -100,20 +87,7 @@ def data(csv_file, vector_length):
 		vects.append(vect)
 
 	sku_hash = sku_vector_hash(sku_words, word_vector_hash, vector_length)
-
 	return vects, class_labels, word_vector_hash, sku_hash
-
-
-	# get a list of only the vectors
-	final_sku_vects = sku_vectors(sku_words, word_vects, vector_length)
-	vects = []
-	for triplet in final_sku_vects:
-		vect = triplet[2]
-		vects.append(vect)
-
-	sku_hash = sku_vector_hash(sku_words, word_vector_hash, vector_length)
-
-	return vects, class_labels, word_vects, sku_hash
 
 
 def log(csv_file, message):
@@ -123,24 +97,27 @@ def log(csv_file, message):
 			writer.writerow([" ".join(m)])
 	return None
 
-def train(csv_file, neighbors, vector_length):
-	sku_vectors, class_labels, word_vectors, sku_hash = data(csv_file, vector_length)
+def train(csv_file, neighbors, vector_length, validation):
+	sku_vectors, class_labels, word_vectors, sku_hash = data(csv_file, vector_length, validation)
 	model = kNN.KNeighborsClassifier(n_neighbors=neighbors, weights='uniform')
 	model.fit(sku_vectors, class_labels)
 	return model, word_vectors, sku_vectors, class_labels, sku_hash
 
 def test(model, neighbors, test_data, class_labels, sample_size, vector_length, sku_hash):
 	correct = 0.
-	start = time.time()
+	sum_score = 0.
 	for i in range(sample_size):
 		prediction = model.predict(test_data[i])[0]
 		p_vector = sku_hash[str(prediction)]
 		predictions = nearest_skus(p_vector, sku_hash)
 		#if int(prediction) == int(class_labels[i]):
-		for p in predictions:
-			if int(p) == int(class_labels[i]):
-				correct += 1.
-	return correct/sample_size
+		correct_answer = class_labels[i]
+		score = 0.0
+		if correct_answer in predictions:
+			score = 1.0/(predictions.index(correct_answer)+1)
+			sum_score += score
+	score = sum_score/sample_size
+	return score
 
 # For testing the test function with varying parameters
 def evaluate():
@@ -152,12 +129,11 @@ def evaluate():
 	log("out2.csv", out)
 
 def real_test():
-	vector_length = 200
 	neighbors = 20
 	output = []
-	model, word_vectors, _, _, sku_hash = train(extra, neighbors, vector_length)
-	queries = kaggle.slice(kaggle.file_to_array(testing, "All"), 2)
-
+	model, word_vectors, _, labels, sku_hash = train(training, neighbors, vector_length, False)
+	
+	queries = kaggle.slice(kaggle.file_to_array(training, True), 3)
 	for q in queries:
 		word_hash = kaggle.string_to_hash(kaggle.format_string(q))
 		vect = query_vector(word_hash, word_vectors, vector_length)
@@ -177,21 +153,20 @@ def nearest_skus(search, sku_vectors):
 		sorted_dist_list.append(str(x[0]))
 	return sorted_dist_list
 
-
-start = time.time()
-
-n = 20
-#sample_size = 42365
-sample_size = 100
-
-model, word_vectors, sku_vectors, labels, sku_hash = train(extra, n, vector_length)
-array = kaggle.file_to_array(training, "All")
-labels = kaggle.slice(array, 1)
-queries = kaggle.slice(array, 3)
-test_data = []
-for q in queries:
-	word_hash = kaggle.string_to_hash(kaggle.format_string(q))
-	test_data.append(query_vector(word_hash, word_vectors, vector_length))
-print test(model, n, test_data, labels, sample_size, vector_length, sku_hash)
-
-print "Duration: " + str(time.time() - start)
+def validation_test():
+	n = 20
+	sample_size = 10591
+	start = time.time()
+	
+	model, word_vectors, sku_vectors, labels, sku_hash = train(extra, n, vector_length, False)
+	array = kaggle.file_to_array(training, True)
+	labels = kaggle.slice(array, 1)
+	print "Examples: " + str(len(labels))
+	queries = kaggle.slice(array, 3)
+	test_data = []
+	for q in queries:
+		word_hash = kaggle.string_to_hash(kaggle.format_string(q))
+		test_data.append(query_vector(word_hash, word_vectors, vector_length))
+	score = test(model, n, test_data, labels, sample_size, vector_length, sku_hash)
+	print "Duration: " + str(time.time() - start)
+	return score
