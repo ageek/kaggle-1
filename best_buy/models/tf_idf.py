@@ -88,10 +88,10 @@ def predict_all(data, model, popularity):
 		output.append(prediction)
 	return output
 
-def voted_predict_all(data, model1, model2, popularity):
+def voted_predict_all(data, model1, model2, popularity, w):
 	predictions1 = predict_all(data, model1, popularity)
 	predictions2 = predict_all(data, model2, popularity)
-	predictions = vote(predictions1, predictions2, popularity)
+	predictions = vote(predictions1, predictions2, popularity, w)
 	return predictions
 
 
@@ -133,12 +133,12 @@ def test_data(csv_file, class_labels_index, input_data_index, validation, items_
 		class_labels, formatted_test_data = class_labels[0:items_count], formatted_test_data[0:items_count]
 	return class_labels, formatted_test_data
 
-def vote(pred1, pred2, popularity):
+def vote(pred1, pred2, popularity, weight):
 	output = []
 
 	uni_gram_weight = 1.0
-	bi_gram_weight = 0.0#0.3
-	popular_weight = 0.0#0.9
+	bi_gram_weight = 0.5#0.3
+	popular_weight = 0.5
 	for index,preds in enumerate(pred1):
 		scored = {}
 		pop = popular.sort_by_popularity(preds + pred2[index], popularity)
@@ -176,14 +176,14 @@ def vote(pred1, pred2, popularity):
 
 		
 
-def real_test():
+def real_test(w):
 	sample_size = 'All'
-	model1, popularity = train_model(training, ngram=1, validation=False)
+	model1, popularity = train_model(training, ngram=1, validation="all")
 	_, popularity = train_model(training, ngram=1, validation="all")
 	model2, _ = train_model(extra, ngram=1, validation='all')
 
-	class_labels, td = test_data(training, 1, 3, True, sample_size)
-	predictions = voted_predict_all(td, model1, model2, popularity)
+	_, td = test_data(testing, 1, 2, 'all', sample_size)
+	predictions = voted_predict_all(td, model1, model2, popularity, w)
 	return predictions
 
 def validation_test():

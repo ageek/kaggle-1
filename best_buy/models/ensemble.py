@@ -4,19 +4,20 @@ import sys
 sys.path.append("../../")
 import kaggle
 import time
+import decision_tree
+import vote
 
 training = "../data/train.csv"
 
-def merge_answers(knn_preds, tf_idf_preds):
-	out = []
-	for i in range(len(knn_preds)):
-		k_pred = knn_preds[i][0]
-		sub_out = [str(int(k_pred))]
-		for t_pred in tf_idf_preds[i]:
-			if str(t_pred) not in sub_out and len(sub_out) < 5:
-				sub_out.append(str(t_pred))
-		out.append(sub_out)
-	return out
+#def merge_answers(knn_preds, tf_idf_preds):
+#	out = []
+#	for i in range(len(knn_preds)):
+#		sub_out = knn_preds[i]
+#		for t_pred in tf_idf_preds[i]:
+#			if str(t_pred) not in sub_out and len(sub_out) < 5:
+#				sub_out.append(str(t_pred))
+#		out.append(sub_out)
+#	return out
 
 def score(predictions, answers):
 	sum_score = 0.
@@ -30,15 +31,16 @@ def score(predictions, answers):
 	score = sum_score/predictions_count
 	return score
 
-def validation_test():
+def validation_test(w):
 	start = time.time()
-	answers = kaggle.slice(kaggle.file_to_array(training, True), 1)
-	tf_idf_predictions = tf_idf.real_test()
-	knn_predictions = knn.real_test()
-	merged = merge_answers(knn_predictions, tf_idf_predictions)
-	accuracy = score(merged, answers)
+	#answers = kaggle.slice(kaggle.file_to_array(training, True), 1)
+	xtrees_preds, forest_preds, knn_preds = decision_tree.real_test()
+	tf_preds = tf_idf.real_test(w)
+	merged = vote.merge_answers(xtrees_preds, forest_preds, tf_preds, knn_preds)
+	kaggle.write_predictions(merged, "../data/predictions_9_28_12.csv")
+	#accuracy = score(merged, answers)
 	print "Duration: " + str(time.time() - start)
-	return accuracy
+	return None#accuracy
 
 def real_test():
 	start = time.time()
@@ -51,4 +53,5 @@ def real_test():
 	print "Duration: " + str(time.time() - start)
 	return None
 
-print validation_test()
+w = 1
+print validation_test(w)

@@ -99,7 +99,7 @@ def log(csv_file, message):
 
 def train(csv_file, neighbors, vector_length, validation):
 	sku_vectors, class_labels, word_vectors, sku_hash = data(csv_file, vector_length, validation)
-	model = kNN.KNeighborsClassifier(n_neighbors=neighbors, weights='uniform')
+	model = kNN.KNeighborsClassifier(n_neighbors=neighbors, weights='distance', algorithm="kd_tree")
 	model.fit(sku_vectors, class_labels)
 	return model, word_vectors, sku_vectors, class_labels, sku_hash
 
@@ -131,7 +131,7 @@ def evaluate():
 def real_test():
 	neighbors = 20
 	output = []
-	model, word_vectors, _, labels, sku_hash = train(training, neighbors, vector_length, False)
+	model, word_vectors, _, labels, sku_hash = train(extra, neighbors, vector_length, False)
 	
 	queries = kaggle.slice(kaggle.file_to_array(training, True), 3)
 	for q in queries:
@@ -158,7 +158,7 @@ def validation_test():
 	sample_size = 10591
 	start = time.time()
 	
-	model, word_vectors, sku_vectors, labels, sku_hash = train(extra, n, vector_length, False)
+	model, word_vectors, sku_vectors, labels, sku_hash = train(training, n, vector_length, False)
 	array = kaggle.file_to_array(training, True)
 	labels = kaggle.slice(array, 1)
 	print "Examples: " + str(len(labels))
@@ -170,3 +170,5 @@ def validation_test():
 	score = test(model, n, test_data, labels, sample_size, vector_length, sku_hash)
 	print "Duration: " + str(time.time() - start)
 	return score
+
+#print validation_test()
