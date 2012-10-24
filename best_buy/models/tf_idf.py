@@ -178,8 +178,8 @@ def vote(pred1, pred2, popularity, weight):
 
 def real_test(w):
 	sample_size = 'All'
-	model1, popularity = train_model(training, ngram=1, validation="all")
-	_, popularity = train_model(training, ngram=1, validation="all")
+	model1, popularity = train_model(training, ngram=1, validation='all')
+	#_, popularity = train_model(training, ngram=1, validation='all')
 	model2, _ = train_model(extra, ngram=1, validation='all')
 
 	_, td = test_data(testing, 1, 2, 'all', sample_size)

@@ -64,8 +64,9 @@ def word_vectors(csv_file, vector_length, validation, word_to_skus=None, generat
 
 # return a list of vectors for each query, and a list of skus for each query,
 # and a hash of words to their vectors that generated the query vectors
-def data(csv_file, vector_length, validation):
-	word_vector_hash = word_vectors(csv_file, vector_length, validation)
+def data(csv_file, vector_length, validation, word_vector_hash=None):
+	if word_vector_hash == None:
+		word_vector_hash = word_vectors(csv_file, vector_length, validation)
 
 	# generate the sku-words
 	sku_words = []
@@ -99,6 +100,12 @@ def log(csv_file, message):
 
 def train(csv_file, neighbors, vector_length, validation):
 	sku_vectors, class_labels, word_vectors, sku_hash = data(csv_file, vector_length, validation)
+	print type(sku_vectors)
+	print type(class_labels)
+	print type(sku_vectors[0])
+	print type(class_labels[0])
+	print sku_vectors[0]
+	print class_labels[0]
 	model = kNN.KNeighborsClassifier(n_neighbors=neighbors, weights='distance', algorithm="kd_tree")
 	model.fit(sku_vectors, class_labels)
 	return model, word_vectors, sku_vectors, class_labels, sku_hash

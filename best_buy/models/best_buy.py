@@ -9,7 +9,7 @@ training = "/home/I829287/kaggle/best_buy/data/train.csv"
 testing = "/home/I829287/kaggle/best_buy/data/test.csv"
 
 def sku_to_searches():
-	array = kaggle.file_to_array(training)
+	array = kaggle.file_to_array(training, "all")
 	#array = array[0:10000:4] + array[1:10000:4] + array[2:10000:4]
 	skus = kaggle.slice(array, 1)
 	skus = set(skus)
@@ -74,6 +74,6 @@ def csv_with_more_data():
 	print count
 	return None
 
-start = time.time()
-csv_with_more_data()
-print time.time() - start
+#start = time.time()
+#csv_with_more_data()
+#print time.time() - start

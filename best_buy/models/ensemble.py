@@ -6,6 +6,7 @@ import kaggle
 import time
 import decision_tree
 import vote
+import time_rank
 
 training = "../data/train.csv"
 
@@ -31,16 +32,19 @@ def score(predictions, answers):
 	score = sum_score/predictions_count
 	return score
 
-def validation_test(w):
+def validation_test():
 	start = time.time()
-	#answers = kaggle.slice(kaggle.file_to_array(training, True), 1)
-	xtrees_preds, forest_preds, knn_preds = decision_tree.real_test()
-	tf_preds = tf_idf.real_test(w)
-	merged = vote.merge_answers(xtrees_preds, forest_preds, tf_preds, knn_preds)
-	kaggle.write_predictions(merged, "../data/predictions_9_28_12.csv")
-	#accuracy = score(merged, answers)
+	answers = kaggle.slice(kaggle.file_to_array(training, True), 1)
+	#xtrees_preds, xtrees2, xtrees3, xtrees4, forest_preds, knn_preds = decision_tree.real_test()
+	models = decision_tree.real_test()
+	#time_preds = time_rank.real_test()
+	#tf_preds = tf_idf.real_test(w)
+	#merged = vote.merge_answers(xtrees_preds, xtrees2, xtrees3, xtrees4, forest_preds, tf_preds, knn_preds, time_preds)
+	merged = vote.vote(models)
+	#kaggle.write_predictions(merged, "../data/predictions_9_29_12.csv")
+	accuracy = score(merged, answers)
 	print "Duration: " + str(time.time() - start)
-	return None#accuracy
+	return accuracy
 
 def real_test():
 	start = time.time()
@@ -53,5 +57,5 @@ def real_test():
 	print "Duration: " + str(time.time() - start)
 	return None
 
-w = 1
-print validation_test(w)
+accuracy = validation_test()
+print "Score: " + str(accuracy)

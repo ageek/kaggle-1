@@ -6,11 +6,12 @@ one = 1
 length = zero + one + one
 
 def random_vector(vector_length):
-	one_count = vector_length * 0.02
-	zero_count = vector_length - one_count
+	one_count = vector_length * 0.01
+	zero_count = vector_length - (2 * one_count)
 	z = zeros(zero_count)
 	positives = ones(one_count)
-	merged = array(list(z) + list(positives))
+	negs = ones(one_count) * -1
+	merged = array(list(z) + list(positives) + list(negs))
 	shuffle(merged)
 	return merged
 
